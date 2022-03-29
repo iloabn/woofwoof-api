@@ -18,7 +18,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "*",
+    origin: ["http://localhost:3000", "https://astounding-boba-c57ae4.netlify.app"],
   })
 );
 app.use(express.json());
