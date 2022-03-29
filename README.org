@@ -1,0 +1,1362 @@
+#+title: Data Interaction Course Materials
+#+author: Jens Östlund, Fabian Miiro
+#+email: jens.ostlund@futurice.com, fabian.miiro@outlook.com
+#+language: en
+#+options: num:3 H:4
+#+export_file_name: docs/index.html
+
+This course aims to give you an understanding of back-end development and in it you will learn how to build an HTTP server in node.js and integrating it with a MongoDB database. The course will focus a lot on JavaScript and give you an understanding for how the language works so you will be able to solve issues in your code more readily.
+
+You can find working code samples for each chapter along with some exercises in [[https://github.com/iensu/data-interaction-course-materials][the course Github repository]].
+
+* Setting up your Environment
+:PROPERTIES:
+:CUSTOM_ID: setting-up-your-environment
+:END:
+In order to follow along with this course you will want to have the following installed:
+
+- [[https://nodejs.org/en/][node.js]] v16 or higher
+- ~npm~
+- An editor with proper JavaScript support (VSCode, Sublime, Vim, Emacs, ...)
+- [[https://git-scm.com/book/en/v2/Getting-Started-Installing-Git][Git]]
+
+You can check that you have all necessary command line tools by running the following commands in your terminal:
+
+#+begin_src shell
+  node --version
+  npm --version
+  git --version
+#+end_src
+
+** Setting up MongoDB
+:PROPERTIES:
+:CUSTOM_ID: setting-up-mongodb
+:END:
+Finally you will need to have access to [[https://docs.mongodb.com/manual/installation/][MongoDB]]. The company MongoDB is pushing really hard for you to use the free-tier of their cloud service Atlas. Unfortunately it requires you to create an account and forces you to go through a lot of settings and options. It's important that you choose the free tier, otherwise you can just use the defaults. They will also apparently bombard you with marketing emails, so if you decide to create an account I recommend you use a throwaway email account.
+
+If you don't like to go through the hassle of setting up an account you can either 1) install MongoDB locally following the instructions in link above or 2) use [[https://hub.docker.com/_/mongo/][the Docker image]] if you are comfortable with Docker. Personally I installed it locally.
+
+MongoDB Compass offers a graphical interface to your database and often comes bundled when installing it locally. If you don't have it installed you can follow [[https://www.mongodb.com/try/download/compass][these instructions]].
+
+*** Installing and running MongoDB on MacOS
+:PROPERTIES:
+:CUSTOM_ID: installing-and-running-mongodb-on-macos
+:END:
+As long as you have [[https://brew.sh/][Homebrew]] installed it's very easy to install both MongoDB and MongoDB Compass on your computer:
+
+#+begin_src shell
+  brew tap mongodb/brew
+  brew install mongodb-community@5.0
+  brew install mongodb-compass
+#+end_src
+
+Installing the =mongodb-community= package should give you two commands:
+- =mongosh= for interacting with a MongoDB database through the terminal.
+- =mongod= for starting a MongoDB database process (the final /d/ stands for /daemon/ and means a long-running process).
+
+When installing through Homebrew it seems that running ~mongod~ by itself doesn't work. So instead you need to start MongoDB as a Homebrew service, which means that MongoDB will be running in the background. You do this by running:
+
+#+begin_src shell
+  brew services start mongodb/brew/mongodb-community
+#+end_src
+
+If everything works, you should be able to run ~mongosh~ and be taken to a MongoDB prompt.
+
+#+caption: Running ~mongosh~ should open a MongoDB prompt like this one
+#+attr_org: :width 700px;
+#+name: mongodb
+[[./assets/mongodb-prompt.png]]
+
+If this is not working you can list your ~brew~ services by running ~brew services list~ and see the status of =mongodb-community=. you can show detailed information about it by running:
+
+#+begin_src shell
+  brew services info mongodb-community
+#+end_src
+
+*** Installing and running MongoDB on Windows
+:PROPERTIES:
+:CUSTOM_ID: installing-and-running-mongodb-on-windows
+:END:
+As long as you have Windows 10 (October 2018 update) or newer it's very easy to install both MongoDB and MongoDB Compass on your computer using =winget=:
+
+#+begin_src shell
+  winget install mongodb.server
+  winget install mongodb.compass.full
+#+end_src
+
+Installing =mongodb.server= installs mongodb as a service that automatically starts when you start your computer.
+You can change it with the =services= application (or =sc= if you rather like using a terminal).
+
+The MongoDB Compass application is easily launched by pressing Start and typing =mongodb=.
+To connect Compass to your server, you simply press "Connect" (no connection string required).
+
+* Introduction to node.js
+:PROPERTIES:
+:CUSTOM_ID: introduction-to-nodejs
+:END:
+In short, node.js is JavaScript for servers and is now one of the most prevalent programming languages in the world. How come it quickly got so popular?
+
+- The same language across the stack (front-end and back-end)
+- Simplify the transition to full-stack for front-end developers
+- The asynchronous nature of JavaScript makes it great for easily building high performance HTTP servers
+
+In summary: familiarity and performance
+
+Node.JS was created 12 years ago by creating a system interface to Chrome’s [[https://en.wikipedia.org/wiki/V8_(JavaScript_engine)][V8 JavaScript engine]]. That means that Node.JS is running the same version of JavaScript as Chrome and other [[https://en.wikipedia.org/wiki/Chromium_(web_browser)][Chromium]]-based browsers such as Microsoft Edge, Brave etc. Which V8 version Node uses dictates what JavaScript features it supports. If you are curious you can check which exact version of V8 your node.js installation is using by running the following command in a terminal:
+
+#+begin_src shell
+  node -p process.versions.v8
+#+end_src
+
+** node.js vs the Browser
+:PROPERTIES:
+:CUSTOM_ID: nodejs-vs-the-browser
+:END:
+Moving JavaScript out of the browser and onto the server results in a few important differences:
+
+- There's no browser environment, that is you do not have access to the global ~window~ and ~document~ objects.
+- You instead have the global variable ~global~ to refer to the global scope.
+- You have the global variable ~process~ for reading environment variables etc.
+- You have access to built-in modules for doing things like reading and writing files and networking etc.
+
+** Hello Node
+:PROPERTIES:
+:CUSTOM_ID: hello-node
+:END:
+We are going to play around with node.js a bit. First create a new directory called ~hello-node~ and move into it. Now create a file called =index.js= and write the following piece of code:
+
+#+caption: Writing to the terminal
+#+begin_src js -n
+  console.log("Hello node! \(>0<)/")
+#+end_src
+
+Now you can run your program with the command ~node index.js~ and you should see =Hello node! \(>0<)/= printed to your terminal. We have run JavaScript outside of the browser and successfully printed text, hooray!
+
+#+begin_aside
+*Why index.js?*
+
+Naming the main file JavaScript file =index.js= is a convention and has no special meaning to node.js itself apart from it being loaded by default when importing a directory. You can think of it as being analogous to =index.html= on a website.
+#+end_aside
+
+*** Using built-in modules
+:PROPERTIES:
+:CUSTOM_ID: using-built-in-modules
+:END:
+Let's use the built-in file system module ~fs~ to play around with files.
+
+#+caption: Writing to files
+#+begin_src js -n
+  import fs from "fs";
+
+  const databases = [
+    { name: 'MongoDB', type: 'document' },
+    { name: 'PostgreSQL', type: 'relational' },
+    { name: 'Neo4j', type: 'graph' },
+    { name: 'Redis', type: 'in-memory' },
+  ];
+
+  fs.writeFileSync("test.txt", JSON.stringify(databases, null, 2));
+
+  const contents = fs.readFileSync("test.txt").toString();
+
+  console.log(`File contents: ${contents}`);
+#+end_src
+
+#+begin_aside
+*ES6 modules vs. CommonJS modules*
+
+The node.js ecosystem is in a state of transitioning towards ES6 modules from the default CommonJS style modules. ES6 modules are sometimes referred to as JavaScript modules or EcmaScript modules.
+
+#+caption: Syntax comparison between ES6 and CommonJS modules
+|                 | ES6               | CommonJS                 |
+|-----------------+-------------------+--------------------------|
+| Imports         | =import x from 'x'= | =const x = require('x')=   |
+| Named exports   | =export x=          | =module.exports.x = { x }= |
+| Default exports | =export default x=  | =module.exports = x=       |
+
+In the examples in this course we are going to use ES6 modules because that syntax is commonly used on the front-end. In order to use ES6 modules in node.js code you need to set the ~type~ property to ~module~ in =package.json=. You can quickly generate a =package.json= file by running ~npm init --yes~ in the terminal.
+
+#+caption: Add support for ES6 modules by editing package.json
+#+begin_src json
+  {
+    "name": "hello-node",
+    "type": "module",
+    ...
+  }
+#+end_src
+
+The difference between the module systems lies not only in cosmetics but also semantics, ES6 modules being a lot more restrictive in when and how you can import modules. Given the flexibility of CommonJS modules we might never see a full transition to ES6 modules.
+#+end_aside
+
+*** Writing our own module
+:PROPERTIES:
+:CUSTOM_ID: writing-our-own-module
+:END:
+Let's create new module with a function that randomly picks an element from a list. And let's call it from =index.js=.
+
+#+caption: random-element.js
+#+begin_src js -n
+  export default function randomElement(xs) {
+    const randomIndex = Math.floor((Math.random() * 10) % xs.length)
+
+    return xs[index];
+  }
+#+end_src
+
+#+caption: index.js
+#+begin_src js
+  import fs from "fs";
+  import randomElement from './random-element.js';
+
+  const databases = [
+    { name: 'MongoDB', type: 'document' },
+    { name: 'PostgreSQL', type: 'relational' },
+    { name: 'Neo4j', type: 'graph' },
+    { name: 'Redis', type: 'in-memory' },
+  ];
+
+  // ...
+
+  const randomDatabase = randomElement(databases);
+
+  console.log(`Got database: ${randomDatabase}`);
+#+end_src
+
+*** Messing around with the global scope
+:PROPERTIES:
+:CUSTOM_ID: messing-around-with-the-global-scope
+:END:
+Using modules is not the only way of sharing functionality, you can also manipulate the global scope by modifying the ~global~ variable.
+
+#+caption: modifying-global-scope.js
+#+begin_src js -n
+  let count = 0;
+
+  global.ourGlobalFunction = (source) => {
+    count++;
+    console.log(`Call count: ${count} (from ${source})`);
+  };
+#+end_src
+
+#+caption: Importing the file updates the global scope (index.js)
+#+begin_src js -n
+  import fs from "fs";
+  import randomElement from './random-element.js';
+  import './modifying-global-scope.js';
+
+  global.ourGlobalFunction(import.meta.url);
+
+  // Since the scope is global we can even call it directly as well
+  ourGlobalFunction(import.meta.url);
+
+  // ...
+#+end_src
+
+*Exercise* Try calling ~ourGlobalFunction~ from =randomElement.js=. Try both within the function and outside. Is it working? If not, why not?
+
+Finally, *please do not modify ~global~ in /real/ code*. it breaks encapsulation and makes it more difficult to understand what's going on.
+
+*** Reading environment variables
+:PROPERTIES:
+:CUSTOM_ID: reading-environment-variables
+:END:
+Another thing we can do in node.js that we can't do in the browser is to get information about the current environment especially things like environment variables.
+
+We can access environment variables via the ~process~ variable:
+
+#+caption: Reading environment variables
+#+begin_src js
+  console.log('USER:', process.env.USER); // Prints your username
+  console.log('MY_VARIABLE', process.env.MY_VARIABLE); // Prints undefined
+#+end_src
+
+#+begin_aside
+*What are environment variables?*
+
+Environment variables are string key-value pairs declared in the environment and are used extensively to configure applications and services. On Linux and MacOS you can list all environment variables in the terminal by running the ~env~ command, on Windows you run ~SET~. Some common environment variables are listed blow:
+
+#+caption: Examples of predefined environment variables
+| Variable | Functionality                                              | OS                 |
+|----------+------------------------------------------------------------+--------------------|
+| ~PATH~     | Specifies which directories have executable programs       | Linux, MacOS, Win  |
+| ~EDITOR~   | Specifies what editor to open files with from the terminal | Linux, MacOS, Win? |
+| ~USER~     | The currently logged in user                               | Linux, MacOS, Win? |
+
+Environment variables can be created freely and this allows us to configure our application depending on the environment (production, test, local development) without having to do explicit checks in the code itself.
+
+On MacOS and Linux you can set environment variables with the ~export~ command.
+
+#+caption: Setting the environment variable ~MY_VARIABLE~ in the terminal
+#+begin_src shell
+  export MY_VARIABLE=foo
+#+end_src
+#+end_aside
+
+* Our First API
+:PROPERTIES:
+:CUSTOM_ID: our-first-api
+:END:
+** What is an Application Programming Interface?
+:PROPERTIES:
+:CUSTOM_ID: what-is-an-application-programming-interface
+:END:
+- An API is a set of exposed methods for interacting with a program or package.
+- When you write a JavaScript module and export functions to interact with it you are designing an API.
+- When you are interacting with a third-party package, for example =express=, you are using its API.
+- Designing an API allows you to create a layer of abstraction which hides implementation details and simplifies using your service or package.
+
+Often when we say API we actually mean an HTTP API to be specific, that is an API which is used over the internet using HTTP.
+
+** Creating our API
+:PROPERTIES:
+:CUSTOM_ID: creating-our-api
+:END:
+Express is by far the most popular NPM package for creating HTTP APIs in node.js and has been around almost as long as the language itself. Start by creating a new directory called =hello-express= and initialize it using ~npm init~ (also don't forget to update =package.json= if you want to use ES6 modules). Now let's install Express:
+
+#+begin_src shell
+  npm install express
+#+end_src
+
+Now let's create our first API by creating a new file called ~index.js~ in the project root directory and write the following code:
+
+#+caption: Our first API
+#+begin_src js -n
+  import express from 'express';
+
+  const app = express();
+
+  app.get('/hello', (req, res) => {
+    res.send('Hello there!').end();
+  });
+
+  const PORT = 8080;
+
+  app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`)
+  });
+#+end_src
+
+There is /a lot/ to unpack here...
+- We begin by creating an instance of an Express app.
+- Then we /register/ a handler on the =/hello= endpoint which will respond with /Hello there!/.
+- Lastly we start a server listening on /port/ 8080.
+
+** Starting our server
+:PROPERTIES:
+:CUSTOM_ID: starting-our-server
+:END:
+Run your program by executing ~node index.js~. The first thing you will notice is that your program never quits: you see the message =Server running at http://localhost:8080= but you don't get a new prompt. This is because your program is running a *server* which is meant to serve *responses* to *requests* from *clients* and your program needs to be kept alive and running to be able to do that.
+
+A client is whatever uses, or /consumes/, the API served by your server and can be anything from a web browser, website, another server or a command-line tool etc. For now, let's use our browser as the client and access the URL printed out by the program: [[http://localhost:8080]]. You should see an error message saying something like =Cannot GET /=.
+
+#+caption: Accessing an unregistered endpoint results in an error message
+#+attr_org: :width 700px;
+#+name: not-found
+[[./assets/cannot-get-slash.png]]
+
+This means that we tried to =GET= something at the endpoint =/=. We'll get more into what =GET= actually means later when we talk about HTTP, but for now let's try changing the endpoint and go to [[http://localhost:8080/hello]] instead. Now you should instead see the expected message =Hello there!=.
+
+#+caption: Successful call to our /hello endpoint
+#+attr_org: :width 700px;
+#+name: hello-there
+[[./assets/hello-express-endpoint.png]]
+
+So what went wrong the first time? There are four pieces of information needed to interact with a server:
+
+- The *protocol* the server expects (=http=)
+- The *machine* the server is running on (our machine =localhost= or =127.0.0.1= if we use its IP address). This is also called the *host*.
+- The *port* the server is listening on (=8080=)
+- The *endpoint* we want to consume (=/hello=)
+
+A server only responds on the port it is listening on and only handles requests on endpoints which have been registered on it. When not specifying an endpoint, the browser will pick the default one which is =/= and since we never registered a handler for that endpoint the request failed. You can think of endpoints as file paths on your own computer.
+
+#+begin_aside
+*Ports*
+
+You can choose any port number for your service between 1025 to 65535 as long as some other currently running service (program) isn't already listening on it. It is very common to see people assign 8080 and I think this comes from repeating 80 which is the default port for the HTTP protocol. When you specify =http://= in the URL =:80= is implicitly appended to the host. In other words, a port is always used even if it is not explicit in the URL. Below is a table of some reserved ports:
+
+|  Port | Protocol |
+|-------+----------|
+|    80 | =http://=  |
+|   443 | =https://= |
+|    22 | =ssh://=   |
+| 20,21 | =ftp://=   |
+#+end_aside
+
+** Adding another endpoint
+:PROPERTIES:
+:CUSTOM_ID: adding-another-endpoint
+:END:
+
+#+caption: Our next endpoint
+#+begin_src js
+  // ...
+
+  app.get('/another-page', (req, res) => {
+    res.send('Another page!').end();
+  });
+
+  // ...
+#+end_src
+
+If we add another endpoint and try to access it in the browser: [[http://localhost:8080/another-page]] we get the same error message as we did before.
+
+The reason is that the server process is already running and changes made to the code will not be reflected until it is restarted. You can stop the server by selecting the terminal where it is running and press Ctrl-c (that means pressing the Ctrl button and the =c= key at the same time). This will terminate your server and get you back to the terminal prompt.
+
+If you now run ~node index.js~ again you will be able to access [[http://localhost:8080/another-page]].
+
+*** Live-reload and other tooling
+:PROPERTIES:
+:CUSTOM_ID: live-reload-and-other-tooling
+:END:
+A workflow like the above is not only annoying but it can also lead to long troubleshooting sessions trying to figure out why something isn't working, when in the end you just had to restart the server. Thankfully there is an NPM package which helps us automate this workflow: [[https://nodemon.io/][nodemon]]. Since we only need it for development we install it as a development dependency:
+
+#+begin_src shell
+  npm install --save-dev nodemon
+#+end_src
+
+Now we add a convenience script called ~dev~ in =package.json= to make it easy to use it:
+
+#+begin_src json
+  {
+    // ...
+    "scripts": {
+      "dev": "nodemon index.js",
+      "test": "echo \"Error: no test specified\" && exit 1"
+    }
+    // ...
+  }
+#+end_src
+
+By running ~npm run dev~ your server will be started up and =nodemon= will watch your files for changes and restart the server when necessary.
+
+There is another tool I highly recommend you install and that is [[https://prettier.io/][prettier]]. This tool formats your code automatically and you should be able to make your editor run it every time you save. Here is a [[https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode][VSCode plugin]] and here is one for [[https://github.com/prettier/prettier-emacs][Emacs]].
+
+** Back to our endpoint
+:PROPERTIES:
+:CUSTOM_ID: back-to-our-endpoint
+:END:
+Let's make our new endpoint do something more interesting: let's see what happens if we serve a string which looks like HTML.
+
+#+caption: Serving an HTML string
+#+begin_src js
+  // ...
+
+  app.get("/another-page", (req, res) => {
+    res
+      .send(
+        `
+  <html>
+  <head>
+    <style>
+    body {
+      margin: 32px;
+      background: hotpink;
+      color: darkgreen;
+      font-family: arial;
+    }
+    </style>
+  </head>
+  <body>
+    <h1>Our beautiful page</h1>
+    <marquee>We're serving a string which is rendered as a web page!</marquee>
+  </body>
+  </html>
+  `
+      )
+      .end();
+  });
+
+  // ...
+#+end_src
+
+And we can see that our browser interprets it as HTML! The secret is that the browser interprets EVERYTHING as HTML, so we shouldn't be surprised.
+
+While it's pretty cool that we can serve web pages as plain strings, what you usually want to do is to serve HTML files instead. We move our HTML to a file which we can call =beautiful-page.html=.
+
+#+caption: Our beautiful HTML markup in a file of its own
+#+begin_src html
+  <html>
+  <head>
+    <style>
+    body {
+      margin: 32px;
+      background: hotpink;
+      color: darkgreen;
+      font-family: arial;
+    }
+    </style>
+  </head>
+  <body>
+    <h1>Our beautiful page</h1>
+    <marquee>We're serving a string which is rendered as a web page!</marquee>
+  </body>
+  </html>
+#+end_src
+
+And we change our handler to read that file and serve its contents.
+
+#+caption: Serving HTML from a file
+#+begin_src js
+  import express from "express";
+  import fs from "fs";
+
+  // ...
+
+  app.get("/another-page", (req, res) => {
+    const contents = fs.readFileSync("beautiful-page.html").toString();
+
+    res.send(contents).end();
+  });
+
+  // ...
+#+end_src
+
+The page should load like before but the code looks a lot nicer without the inline HTML.
+
+A website made up from files like this is called a *static website*. This is how the whole web worked through-out the 90s and the beginning of the 00s until *Single Page Applications* (SPAs) became a thing. In this course we will assume you will write your website as a SPA (in React), so we won't be serving static pages. In addition, the above code is highly inefficient and is just for illustrative purposes. First we are reading the HTML file for every request even though the contents doesn't change, this will lead to a lot of file system access which impacts performance. Second, we send the page a single string all at once which also impacts performance. If you are interested in how to serve static web pages using Express you can have a look [[https://expressjs.com/en/starter/static-files.html][at this documentation]].
+
+* HTTP + API Deep-dive
+:PROPERTIES:
+:CUSTOM_ID: http-api-deep-dive
+:END:
+* Intro to MongoDB
+:PROPERTIES:
+:CUSTOM_ID: intro-to-mongodb
+:END:
+MongoDB is a [[https://www.mongodb.com/document-databases][document (NoSQL) database]] and has a few important characteristics which makes it a suitable as a first database:
+
+- Flexible data schemas.
+- Intuitive data models (basically looks like JSON).
+- Simple yet powerful query language.
+
+MongoDB, and document databases in general, are often used in MVPs and prototypes when you are still exploring and have yet to decide on the data models to use. This does not mean however that they are not production-ready: document databases are among the most scalable databases out there and allow for efficient horizontal scaling (this means running multiple connected instances in a database cluster).
+
+While we discuss MongoDB specifically in this section many of the concepts are applicable to other document databases as well such as CouchDB and elasticsearch, though the terminology might be a bit different.
+
+A MongoDB system consists of one or several *databases*, which each can have one or multiple *collections* and each collection contains *documents*. Documents are the central concept of a document database, naturally.
+
+** Schemas in MongoDB
+:PROPERTIES:
+:CUSTOM_ID: schemas-in-mongodb
+:END:
+The main selling point of MongoDB compared to relational (SQL) databases (MySQL, Postgres, ...) is the flexibility. In relational databases you have to define how your data is structured and the relationship between different kinds of data models. The structure of your data is called its schema or sometimes its data model and defines the properties it has and what data types these properties have. Here's a made-up example of how a schema might look like:
+
+#+description: Pseudo-code for a schema definition
+#+begin_src js
+  PersonSchema = {
+    "id": "string",
+    "name": "string",
+    "age": "integer",
+    "weight": "float",
+  }
+#+end_src
+
+In a *relational database* a schema like the above ensures for instance that a ~Person~'s name is a ~string~ and that its weight is a ~float~. If you would try to store a ~Person~ with a ~string~ weight the operation would fail. This makes it difficult for bad and ill-structured data to enter the database.
+
+In a *document database* schemas still exist, but they are just suggestions and are meant to improve performance when querying the data. As you most likely will see when you start to work with MongoDB yourself is that it will happily accept a ~float~ as the ~name~, or even allow you to insert documents with a completely different set of properties in the same collection.
+
+#+caption: Table data view in MongoDB Compass showing the inferred types for each column
+#+attr_org: :width 700px
+#+name: schema-example
+[[./assets/mongodb-compass-table-example.png]]
+
+
+This flexibility is something to be mindful of and I recommend using MongoDB Compass to explore your data set from time to time to ensure that it looks like you expect it to.
+
+** MongoDB Operations
+:PROPERTIES:
+:CUSTOM_ID: mongodb-operations
+:END:
+Operations are ways of interacting with your database in the terms of data, the most general operations being:
+
+- *Create* data
+- *Read* data
+- *Update* data
+- *Delete* data
+
+These are often called CRUD operations for short.
+
+The following sections describes what the common CRUD operations are in MongoDB and examples assume that you have a connected ~db~ database instance available:
+
+#+caption: Prelude to the examples below
+#+begin_src js
+  const client = mongodb.MongoClient('mongodb://localhost:27017');
+  await client.connect();
+
+  const db = client.db('mongodb-intro');
+#+end_src
+
+The code assumes that you have the ~mongodb~ package in scope and you are in an ~async~ context where you can use ~async~.
+
+*** Inserting documents
+:PROPERTIES:
+:CUSTOM_ID: inserting-documents
+:END:
+In MongoDB the act of creating data in a collection is called *inserting*.
+
+#+caption: Inserting one document
+#+begin_src js :session mongodb
+  await db.collection('languages').insertOne({
+    name: 'JavaScript',
+    family: 'C',
+    year: 1995
+  });
+#+end_src
+
+#+caption: Inserting multiple documents
+#+begin_src js :session mongodb
+  const languages = [{
+      name: 'Haskell',
+      family: 'ML',
+      year: 1990
+    }, {
+      name: 'Rust',
+      family: 'ML',
+      year: 2010,
+    }, {
+      name: 'Java',
+      family: 'C',
+      year: 1995,
+    }, {
+      name: 'Common Lisp',
+      family: 'Lisp',
+      year: 1984,
+    }];
+
+  await db.collection('languages').insertMany(languages)
+#+end_src
+
+*** Finding (Filtering or Querying) documents
+:PROPERTIES:
+:CUSTOM_ID: finding-filtering-or-querying-documents
+:END:
+The operations for reading data are called *find* in the API but are often referred to as filtering or querying as well.
+
+#+caption: Empty filter returns all documents
+#+begin_src js
+  const cursor = db.collection("languages").find({});
+  const results = cursor.toArray();
+
+  console.log(results);
+#+end_src
+
+The ~find~ operation can potentially return a huge amount of documents depending on the size of your data set so it does not return the results directly, but a *cursor* pointing to the results. This allows you to either do further processing or return a subset of the results. You can get all of the matching results by calling its ~toArray()~ method as in the example above.
+
+The simplest filter apart from an empty one is to match on properties exactly. In this example we are picking out allow of the programming languages related to C in our data set.
+
+#+caption: Filtering with a specific property value
+#+begin_src js
+  const filter = {
+    family: 'C' // Matching property exactly
+  }
+  const results = await db.collection('languages').find(filter).toArray();
+
+  console.log(results);
+#+end_src
+
+The ~findOne~ operation will return the first document it finds which matches the filter.
+
+#+caption: Finding one document
+#+begin_src js
+  const filter = {
+    type: 'ML'
+  }
+
+  const result = await db.collection('languages').findOne(filter);
+#+end_src
+
+For more advanced filtering we use [[https://docs.mongodb.com/manual/reference/operator/query/][query operators]], you can quickly identify them since they start with a ~$~. Some common ones are ~$gte~ (greater-than-or-equal), ~$lte~ (less-than-or-equal) and ~$regex~ for matching against a [[https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions][regular expression]].
+
+#+caption: Finding all languages with Java in their name
+#+begin_src js
+  const filter = {
+    name: { $regex: /Java/ }
+  }
+  const results = await db.collection('languages').find(filter).toArray();
+
+  console.log(results);
+#+end_src
+
+#+begin_aside
+*What are regular expressions?*
+
+Regular expressions (aka /regex/ and /regexps/) are a way of creating text search patterns. In JavaScript you can create regular expressions in two ways: ~/pattern/~ or ~new RegExp("pattern").~ Regexes are an invaluable tool and used all over the place so I highly recommend spending some time getting to know the syntax:
+
+- [[https://cheatography.com/davechild/cheat-sheets/regular-expressions/][Regular expression cheatsheet]]
+- [[https://regex101.com/][Regular expression test page]]
+#+end_aside
+
+We can also combine multiple operators to express more complex queries; the next example finds all of the languages created in the 90s.
+
+#+caption: Finding all languages from the 90s
+#+begin_src js
+  const filter = {
+    year: {
+      $gte: 1990,
+      $lte: 1999
+    }
+  };
+#+end_src
+
+You can sort your results with the cursor's ~sort~ method by passing it an object containing the property you want to sort on and ~1~ for ascending results (low to high) or ~-1~ for ascending (high to low).
+
+#+caption: All programming languages sorted by year
+#+begin_src js
+  const cursor = await db.collection('languages').find({});
+  const results = cursor.sort({ year: 1 }).toArray();
+
+  console.log(results);
+#+end_src
+
+*** Deleting documents
+:PROPERTIES:
+:CUSTOM_ID: deleting-documents
+:END:
+Deleting documents is very similar to finding documents just replace the ~find~ or ~findOne~ methods with ~deleteMany~ or ~deleteOne~, the methods use the same kind of filters.
+
+#+caption: Delete Java
+#+begin_src js
+  await db.collection('languages').deleteOne({
+    name: 'Java'
+  });
+#+end_src
+
+*** Updating documents
+:PROPERTIES:
+:CUSTOM_ID: updating-documents
+:END:
+Updating can be seen as a combination of a find operation and a write operation. As with the other operations you can either call ~updateOne~ or ~updateMany~ to update multiple documents at the same time and these methods take two arguments: a filter object to specify which documents will be affected, and an update object defining the modification.
+
+#+caption: Bringing JavaScript to the 2000s
+#+begin_src js
+  const filter = { name: 'JavaScript'};
+  const modification = { $set: { year: 2022 } };
+
+  await db.collection('languages').updateOne(filter, modification)
+#+end_src
+
+* JavaScript Deep-Dive
+:PROPERTIES:
+:CUSTOM_ID: javascript-deep-dive
+:END:
+This section provides a smorgosbord of JavaScript concepts and weirdness. We won't have time to go into all of the nitty gritty details for each topic but rather use them to illustrate more general computing concepts. We will touch upon processes and threads, scope, bindings, functional programming, equality. There's a lot of ground to cover, so let's get started!
+
+** Async, Await and the Promise of a Path out of Callback Hell
+:PROPERTIES:
+:CUSTOM_ID: async-await-and-the-promise-of-a-path-out-of-callback-hell
+:END:
+JavaScript is allegedly "asynchronous by default" AND "single-threaded", but what does this actually mean? What is *synchronous* versus *asynchronous* execution? In short asynchronous execution allows us to do more work at the same time (concurrently). First let's have a look at how the browser executes JavaScript.
+
+#+caption: A very simplified view of how a web browser works
+#+attr_org: :width 700px
+#+name: web-browser
+[[./assets/simplified-browser-process.png]]
+
+The browser has a main thread which is responsible for not only executing JavaScript but also rendering the HTML and CSS as well as handling user input like clicks and scrolling. If JavaScript allowed for synchronous HTTP requests the whole browser tab would stall while waiting for the response to come back. This is of course something we want to avoid at all costs and thus JavaScript does these sort of I/O operations asynchronously by default for us.
+
+#+begin_aside
+*What is I/O?*
+
+I/O stands for Input/Output and designates any operations that /reaches outside/ of the main process, such as HTTP requests, reading from files, writing to files etc.
+#+end_aside
+
+All asynchronous operations are put on the *Event Queue* so as to not block the main thread, and from there the operations are executed in other threads. It is important to understand that once a piece of code has gone on the event queue, there's really no way of fully "getting back" to the main thread.
+
+Even though the explanation above focused on JavaScript in the browser node.js works in very much the same way with a main thread and an event queue to handle asynchronous requests. It's important to know understand that the node.js process will stay alive for as long as there is something on its event queue.
+
+#+begin_aside
+*Process vs. threads?*
+
+You can think of a process as an application running on your computer: VSCode, Chrome, Spotify etc. When you run ~node index.js~ to start your server, you are actually starting a new process. Each process runs in isolation and has its own section of memory which other processes cannot see or touch. Threads on the other hand are what are actually executing the instructions in your code. A process can either be single-threaded, meaning that it only uses one thread, or multi-threaded.
+
+You can check which processes are currently running in the Task Manager on Windows or in the Activity Monitor on MacOS. On MacOS you can also list them in the terminal by running the command ~ps aux~.
+#+end_aside
+
+*** Callback Hell
+:PROPERTIES:
+:CUSTOM_ID: callback-hell
+:END:
+In the beginning there was the callback.
+
+#+caption: Collecting all files in a directory using callbacks
+#+begin_src js -n
+  fs.readdir(directory, (err, files) => {
+    if (err) {
+      console.log('Error finding files: ', err)
+    } else {
+      files.forEach((filename) => {
+        const filePath = `${directory}/${filename}`;
+        fs.stat(filePath, (err, fileStats) => {
+          if (err) {
+            console.log('Error checking file status: ', err)
+          } else {
+            if (fileStats.isFile())
+              console.log('Found file:', filePath);
+            }
+        })
+      })
+    }
+  })
+#+end_src
+
+This was the only means of handling asynchronous operations and as you can see from the example above, it quickly lead to unreadable and nested spaghetti code. Adding proper error handling made things worse which meant you would often skip error handling for the sake of readability, leading to code that was broken and error prone. Promises was created to solve this issue and remove the nested spaghetti mess of the code above.
+
+*** The Promise of Heaven
+:PROPERTIES:
+:CUSTOM_ID: the-promise-of-heaven
+:END:
+A Promise can be thought of as a /promise of a future value/, that is, we do not have the value yet, but we capture the promise of it in a variable that we can use in our code. Before we revisit the file listing example above, let's look at the connection between callbacks and promises using ~setTimeout~.
+
+#+caption: Using setTimeout to delay console.log by a second
+#+begin_src js -n
+  console.log('Before setTimeout')
+
+  setTimeout(() => {
+    console.log('Inside setTimeout')
+  }, 1000);
+
+  console.log('After setTimeout')
+#+end_src
+
+The output of the above example should be:
+
+#+begin_src shell
+  Before setTimeout
+  After setTimeout
+  # After one second:
+  Inside setTimeout
+#+end_src
+
+The node.js process is kept alive until the callback passed to ~setTimeout~ is finished and prints its output. The callback is put on the event queue and hence executed asynchronously. We see that since the last ~console.log~ statement in the code, which is executed by the main thread, is printed out before the one in ~setTimeout~.
+
+We can turn the ~setTimeout~ call into a ~Promise~ by using the ~Promise~ constructor which takes a callback function with two arguments a ~resolve~ function and a ~reject~ function. For now we'll only focus on the ~resolve~ function which /resolves/ the promise.
+
+#+caption: ~setTimeout~ as a ~Promise~
+#+begin_src js -n
+  console.log('Before setTimeout')
+
+  new Promise((resolve, reject) => {
+    setTimeout(() => {
+      console.log('Inside setTimeout')
+      resolve();
+    }, 1000);
+  });
+
+  console.log('After setTimeout')
+#+end_src
+
+The output should be the same as in the previous example. But why would we want to wrap an asynchronous call in a ~Promise~ like this? Because it allows us to untangle the nested horizontal callback hell pyramid of doom that we saw above. The weapon we have at our disposal is the ~then~ method of the promise:
+
+#+caption: Untangling the file collecting callback hell from before
+#+begin_src js -n
+  // We wrap our functions in functions that return promises
+  const readdir = (dir) => {
+    return new Promise((resolve, reject) => {
+      fs.readdir(dir, (err, files) => {
+        if (err) {
+          // We can handle errors by passing them to the reject callback
+          reject('Error finding files: ', err)
+        } else {
+          // and pass on values to the next Promise in the chain by
+          // using the resolve callback
+          resolve(files);
+        }
+      })
+    })
+  }
+
+  const fileStats = (filePath) => {
+    return new Promise((resolve, reject) => {
+      fs.stat(filePath, (err, fileStats) => {
+          if (err) {
+            reject('Error checking file status: ', err)
+          } else {
+            resolve(fileStats);
+          }
+      })
+    })
+  }
+
+  readdir(directory)
+    .then((directoryContents) => {
+      directoryContents.forEach((name) => {
+        const filePath = `${directory}/${name}`;
+
+        fileStats(filePath).then((stats) => {
+            if (stats.isFile()) {
+              console.log('Found file:', filePath);
+            }
+          }).catch((err) => {
+            console.log(err);
+          });
+      })
+    }).catch((err) => {
+      console.log(err);
+    })
+#+end_src
+
+If we ignore the boilerplate code for creating our promises, the code looks a little bit neater now. It's still nested but we've been able to extract the error handling so it doesn't pollute our core logic as much. We can do better however. The helper function ~Promise.all~ will allow us to pass a list of promises and get back the results of all promises in as a list:
+
+#+caption: Pillar of promises
+#+begin_src js
+  readdir(directory)
+    .then((directoryContents) => directoryContents.map((name) => `${directory}/${name}`))
+    .then((filePaths) => {
+
+      // Collect all of the stats calls into a list of promises
+      const promises = filePaths.map((filePath) =>
+        fileStats(filePath).then((stats) => ({
+          filePath,
+          isFile: stats.isFile()
+        }))
+      );
+
+      // Use Promise.all to make this promise resolve when all promises in the list are resolved.
+      return Promise.all(promises);
+    })
+    .then((maybeFiles) => maybeFiles.filter((f) => f.isFile))
+    .then((files) => files.map((f) => f.filePath))
+    .then((paths) => console.log(paths))
+     // Now we only need one (1!) catch
+    .catch((err) => console.log(err))
+#+end_src
+
+Now instead of having a horizontal callback pyramid of doom, we have a pillar of promises. Many of the operations we do in the ~then~ clauses are not asynchronous themselves, but once we enter Promiseland there's no escape. You can only use the result of a promise in its ~then~ clause, and since ~then~ also returns a ~Promise~ we can't get out.
+
+The main benefit of this approach is that we reduce the nesting and our error handling is significantly simplified. However, we can do better. Enter async/await.
+
+*** Awaiting salvation
+:PROPERTIES:
+:CUSTOM_ID: awaiting-salvation
+:END:
+The final improvement we can do is to replace our pillar of promises with awaits, but first let's look at the relationship between ~async~ functions, ~await~ and promises.
+
+You can think of ~await~ being similar to calling ~then~ on a promise, the main difference is that ~await~ can only be used in an ~async~ context.
+
+#+caption: ~await~ in an ~async~ context
+#+begin_src js -n
+  // We can't do this:
+  await fetch('https://http.cat/500')
+
+  const foo = async () {
+    // This is OK since we're in an async arrow function context
+    await fetch('https://http.cat/200')
+  }
+
+  async function bar() {
+    // This is OK since we're in an async function context
+    await fetch('https://http.cat/200')
+  }
+#+end_src
+
+In fact, if you log the _unawaited_ return value of an ~async~ function you will see that it actually returns a ~Promise~:
+
+#+caption: All ~async~ functions return ~Promise~:s
+#+begin_src js -n
+  async function willReturnAPromise() {
+    return 42
+  }
+
+  console.log(willReturnAPromise()) // Prints: Promise { 42 }
+#+end_src
+
+This means that you can ~await~ ~Promise~:s and ~then~ ~async~ functions:
+
+#+caption: Awaiting promises and then async functions
+#+begin_src js -n
+  async function foo() {
+    return 10;
+  }
+
+  async function () {
+    const ten = await Promise.resolve(10);
+    console.log(ten);
+
+    await foo().then((result) => console.log(result + 32));
+  }
+#+end_src
+
+Understanding this, we are now equipped to clean-up our file listing example above and make it really appear synchronous.
+
+#+caption:
+#+begin_src js
+  async function listFilesInDirectory(directory) {
+    try {
+      const directoryContents = await readdir(directory);
+      const filePaths = directoryContents.map((name) => `${directory}/${name}`);
+      const promises = filePaths.map((filePath) =>
+        fileStats(filePath).then((stats) => ({
+          filePath,
+          isFile: stats.isFile()
+        }))
+      );
+      const maybeFiles = await Promise.all(promises);
+      const files = maybeFiles.filter((f) => f.isFile);
+      const paths = files.map((f) => f.filePath);
+      console.log(paths);
+    } catch (err) {
+      console.log(err);
+    }
+  }
+#+end_src
+
+** Fun with functions
+:PROPERTIES:
+:CUSTOM_ID: fun-with-functions
+:END:
+This is the section where we dip our toes into functional programming. While JavaScript is object oriented in that almost everything is an object with methods and properties, at its core it's actually very much a functional language where functions are front and center.
+
+#+begin_aside
+*Functional Programming vs. Object Oriented Programming*
+
+Functional programming (FP) is influenced by mathematics and especially [[https://plato.stanford.edu/entries/lambda-calculus/][Lambda calculus]]. You don't have to understand Lambda calculus to program in a functional programming style. What developers usually mean when talking about functional programming are these three points:
+
+- Referential transparency :: This means that a function must always return the same thing given the same arguments, that is you should always be able to replace the function call with the result of the call.
+- Higher-order functions :: Functions take functions as arguments or functions that return functions.
+- Function composition :: Creating more complicated behavior by combining functions.
+
+In practice this means for instance that you avoid using side-effects such as mutations. The reason you want to avoid side-effects and unnecessary mutations is that it can lead to unintended and surprising results which may lead to bugs and your code becoming harder to debug.
+
+#+caption: Two append functions one of which has the side-effect of updating the original list
+#+begin_src js -n
+  function functionalAppend(list, element) {
+    return [...list, element]
+  }
+
+  function mutatingAppend(list, element) {
+    list.push(element);
+    return list;
+  }
+
+  const originalList = [1, 2, 3];
+
+  let result = functionalAppend(originalList, 4);
+
+  console.log(result); // [1, 2, 3, 4]
+  console.log(originalList); // [1, 2, 3]
+
+  result = mutatingAppend(originalList, 4);
+
+  console.log(result); // [1, 2, 3, 4]
+  console.log(originalList); // [1, 2, 3, 4] <- !!!!!!!!
+#+end_src
+
+Another consequence of functional programming is that you clearly separate the data and operations on the data.
+
+Although most languages can be used in a more or less functional style, there are certain languages that are considered /functional/ like [[https://www.haskell.org/][Haskell]], [[https://elixir-lang.org/][Elixir]], [[https://clojure.org/][Clojure]] and [[https://elm-lang.org/][Elm]].
+
+Object oriented programming (OOP) is extremely common and you encounter this style a lot. Below are the four principles of OOP (taken from [[https://docs.microsoft.com/en-us/dotnet/csharp/fundamentals/tutorials/oop][Object-oriented programming in C#]]):
+
+- Abstraction :: Modeling the relevant attributes and interactions of entities as classes to define an abstract representation of a system.
+- Encapsulation :: Hiding the internal state and functionality of an object and only allowing access through a public set of functions.
+- Inheritance :: Ability to create new abstractions based on existing abstractions.
+- Polymorphism :: Ability to implement inherited properties or methods in different ways across multiple abstractions.
+
+The goal of OOP is to create modular and flexible code. Some common languages that more or less strictly follows OOP are [[https://www.java.com/en/][Java]], [[https://en.wikipedia.org/wiki/C_Sharp_(programming_language)][C#]] and [[https://en.wikipedia.org/wiki/Smalltalk][Smalltalk]].
+
+A common critique of OOP is that it can lead to extremely complex code with an excess of abstraction layers which add very little to in form of functionality. This kind of over-engineering is not specific to OOP though and can also be seen in code-bases following a functional programming approach. The tendency to rely on mutation does however often lead to code that is hard to debug.
+
+If the topic of programming languages interests you I can't recommend [[https://www.coursera.org/learn/programming-languages][Dan Grossman's course on programming languages]] enough. It is by far the best programming course I have ever taken and will give you a thorough understanding of different programming paradigms.
+#+end_aside
+
+We are going to have a look at the power of functional programming by implementing some of the JavaScript array methods ourselves, namely ~[].map()~, ~[].filter()~ and ~[].reduce()~.
+
+
+*** Implementing our own ~map~
+:PROPERTIES:
+:CUSTOM_ID: implementing-our-own-map
+:END:
+A mapping function takes an operation and a list and returns a list where the operation has been applied to each element.
+
+#+caption: Our own ~map~ function
+#+begin_src js -n
+  const map = (operation, list) => {
+    let results = [];
+
+    for (element of list) {
+      results.push(operation(element));
+    }
+
+    return results;
+  };
+#+end_src
+Since we will apply an operation to each element in the list we need our operations to take only 1 argument. We can do that by turning a multi-argument function into a so-called /higher-order function/ that only take one argument and returns a function which takes the next argument. This is called [[https://javascript.info/currying-partials][currying]].
+
+#+caption:
+#+begin_src js -n
+  function add(x) {
+    return function (y) {
+      return x * y;
+    };
+  }
+
+  // The above can be shortened to this using arrow functions:
+  const subtract = (x) => (y) => x - y;
+
+  // Now we can "configure" our operation according to our needs. Let's
+  // create an operation that takes 1 argument and adds 5 to it:
+  const addFive = add(5);
+#+end_src
+
+The ~addFive~ function is a function that takes one number as its argument and adds 5 to it, so we can readily pass it to our ~map~ function:
+
+#+caption: Using ~addFive~ in our ~map~ function
+#+begin_src js
+  const result = map(addFive, [1, 2, 3, 4]);
+  console.log(result) // [6, 7, 8, 9]
+#+end_src
+
+*** Implementing our own ~filter~
+:PROPERTIES:
+:CUSTOM_ID: implementing-our-own-filter
+:END:
+A filter function takes a function and a list. The function passed to filter should return either ~true~ or ~false~ when given an element of the list and ~filter~ will return a list of all elements for which the function returned ~true~. This kind of function is usually called a *predicate*.
+
+#+caption: Our filter function
+#+begin_src js -n
+  const filter = (predicate, list) => {
+    let results = [];
+
+    for (element of list) {
+      if (predicate(element)) {
+        results.push(element);
+      }
+    }
+
+    return results;
+  };
+
+  // Our predicate function which returns true if the passed in value is even
+  const isEven = (x) => x % 2 == 0;
+
+  const result = filter(isEven, [1, 2, 3, 4]);
+  console.log(result) // [2, 4]
+#+end_src
+
+*** Implementing our own ~reduceList~
+:PROPERTIES:
+:CUSTOM_ID: implementing-our-own-reducelist
+:END:
+You might have noticed that there are some code duplication between applyToElements and keepIf. Let's try and generalize what we are doing and extract the common bits into another function: ~reduceList~:
+
+#+caption: ~reduceList~
+#+begin_src js -n
+  const reduceList = (operation, list) => {
+    let results = [];
+
+    for (element of list) {
+      // Since we don't know what the operation will do to the
+      // accumulated results list (append or not append), we need
+      // to be able to pass it to the operation function:
+      results = operation(results, element);
+    }
+
+    return results;
+  };
+#+end_src
+
+~reduceList~ is able to handle both mapping and filtering at the expense of the operation functions becoming more specific in that they need to update the results list.
+
+#+caption: Re-implementing ~map~ and ~filter~ using ~reduceList~
+#+begin_src js -n
+  let result = reduceList((results, x) => {
+    return [...results, addFive(x)];
+  }, [1, 2, 3, 4]);
+
+  console.log(result); // [6, 7, 8, 9]
+
+  result = reduceList((results, x) => {
+    if (isEven(x)) {
+      return [...results, x];
+    }
+
+    return results;
+  }, [1, 2, 3, 4]);
+
+  console.log(result); // [2, 4]
+#+end_src
+
+*** Implementing our own ~reduce~
+:PROPERTIES:
+:CUSTOM_ID: implementing-our-own-reduce
+:END:
+We can go further though; by allowing the caller to pass in the accumulator (results) we can actually handle even more use-cases.
+
+#+caption: Our ~reduce~ function
+#+begin_src js -n
+  const reduce = (operation, list, accumulator) => {
+    for (element of list) {
+      accumulator = operation(accumulator, element);
+    }
+
+    return accumulator;
+  };
+#+end_src
+
+We can use ~reduce~ to not only work with lists, but we can actually use it do calculations as well if we pass in a number as the accumulator.
+
+#+caption: Using ~reduce~ to add a list of numbers together
+#+begin_src js -n
+  const result = reduce((sum, x) => sum + x, [1, 2, 3, 4], 0);
+
+  console.log(result); // 10
+#+end_src
+
+Passing an object as the accumulator allows us to create more complex aggregations from for instance a list of objects. The name ~reduce~ might start to make sense now, we are taking a list of something and /reducing/ it to a value of some sort.
+
+#+caption: Using ~reduce~ to produce a count of dog breeds
+#+begin_src js -n
+  // Or build an object from a list
+  const dogs = [
+    { name: "Fido", breed: "Chihuahua" },
+    { name: "Woofmeister", breed: "Poodle" },
+    { name: "Puglifer", breed: "Pug" },
+    { name: "Poddle McPoodleface", breed: "Poodle" },
+  ];
+
+  const result = reduce((accumulator, dog) => ({
+    ...accumulator,
+    [dog.breed]: (accumulator[dog.breed] || 0) + 1,
+  }), dogs, {});
+
+  console.log(result) // { 'Chihuahua': 1, 'Pug': 1, 'Poodle': 2 }
+#+end_src
+
+Now we have implemented almost a full version of the JavaScript reduce array method [].reduce. I hope this illustrates the power of the concept of higher-order functions. Higher-order functions together with referential transparency (the fact that a function should always return the same result when passed the same arguments) are at the heart of functional programming and grasping the potential of them allows for very powerful abstractions.
+
+* Further into APIs
+:PROPERTIES:
+:CUSTOM_ID: further-into-apis
+:END:
+For this section we will work on [[./examples/04c-woofwoof-api][the WoofWoof API]] we developed in class and use it to illustrate various API-related topics such as REST, middlewares, query parameters and CORS. We begin by looking at what endpoints we have thus far:
+
+| HTTP Method | Endpoint  | Action                  |
+|-------------+-----------+-------------------------|
+| POST        | ~/dogs~     | Add a dog               |
+| GET         | ~/dogs~     | Retrieve all dogs       |
+| GET         | ~/dogs/:id~ | Retrieve a specific dog |
+| PATCH       | ~/dogs/:id~ | Update a specific dog   |
+| DELETE      | ~/dogs/:id~ | Delete a specific dog   |
+
+We have route handlers for adding dogs, getting all dogs or a specific dogs, we can also update a dog entry or delete it. In fact, this API is a good example of a simple REST API.
+
+** What is a REST API?
+:PROPERTIES:
+:CUSTOM_ID: what-is-a-rest-api
+:END:
+REST stands for /Representational State Transfer/ and is a convention for how to write an HTTP API. One of the most important aspect of a REST API is that it has a *common interface* regardless of the type of data resource it is exposing. A REST API is also meant to be *client (/frontend/) agnostic* and able to support different clients and use-cases at once. Another important aspect is that a REST API needs to be *stateless*, which means that the server should not hold any client-specific state and that everything needed to fulfill a query must be provided in the request (given the same input we should get identical output). REST APIs make sense when fronting a database where we have one or more collections of things and need to add, find, update and/or delete entries (see the section on MongoDB).
+
+The interface of our WoofWoof API is an example of a typical REST API: you operate on the whole =dogs= collection using the =/dogs= endpoint and we use different HTTP methods (or verbs) to either retrieve dogs (=GET=) or add a dog to the collection (=POST=). If we want to do something to a specific dog entry we append its ID: =/dogs/:dogId=, and use HTTP methods to specify the action: retrieve (=GET=), update (=PATCH=) and delete (=DELETE=).
+
+So what are the benefits of using a REST API? First of all, having a uniform interface to an API greatly simplifies integrating it to frontends or other APIs. If your API is a unique snowflake it will most likely require more work for the people using your API. Another benefit is the ability to cache responses since all information required is provided by the request.
+
+** Adding a Middleware: Request Logging                            :noexport:
+:PROPERTIES:
+:CUSTOM_ID: adding-a-middleware
+:END:
+** Improving our Search with Query Parameters                      :noexport:
+:PROPERTIES:
+:CUSTOM_ID: improving-our-search-with-query-parameters
+:END:
+** Connecting a Frontend Client: Say Hi to CORS                    :noexport:
+:PROPERTIES:
+:CUSTOM_ID: connecting-a-frontend-client
+:END:
+
+* How to Structure your Project
+:PROPERTIES:
+:CUSTOM_ID: how-to-structure-your-project
+:END:
+For the brief you are to write an HTTP API and some front-end client which uses your API. There are a few ways to go about doing this and in this section I am going to list some common approaches.
+
+First, it helps if you consider your API and your client as completely separate services, imagine that you are two teams: one working on the front-end and one on the back-end.
+
+** How many Repos?
+:PROPERTIES:
+:CUSTOM_ID: how-many-repos
+:END:
+The first question you might face is one git repository or two repositories? What do I mean by this? In the single repository case you have both the back-end API and the front-end client in the same directory as in the listing below.
+
+#+caption: Single repository project
+#+begin_src shell
+  my-service
+  ├── .git
+  ├── client
+  │   ├── node_modules
+  │   ├── src
+  │   │   └── index.js
+  │   ├── package-lock.json
+  │   └── package.json
+  ├── server
+  │   ├── node_modules
+  │   ├── src
+  │   │   └── index.js
+  │   ├── package-lock.json
+  │   └── package.json
+  └── README.md
+#+end_src
+
+The benefit of single repository is that it's very easy to make correlated changes to the client and the server at the same time and in the same commit. This ensures that the current client and the current server are compatible, if you make sure to update both at the same time that is. This practice is also referred to as a mono-repo and its an approach that companies such as Google use and from what I have heard over 90% of their code resides in a giant mono-repo.
+
+So what are the drawbacks of a mono-repo? Mainly it becomes a bit more complicated to deploy your application since you will need to support multiple means of deployment within the same repository. For instance Netlify or Vercel for the client and Heroku or Digital Ocean for the server. You need to make sure to restrict your deployments to sub-folders of your repository. There's also a question of how flexible you can be with regards to deployments: will you be forced to use separate branches for deployment or will you be able to use git tags.
+
+Another drawback of having a mono-repo is that git was not meant to handle huge code bases, so if your service would scale to the size of Google you will have to implement workarounds and/or even modify git to allow your team to work efficiently. You most likely will not reach that stage during this course.
+
+The other common pattern is to split everything up into separate git repositories, one for your client and one for your server. This makes it easier to treat them as separate services and can simplify the deployment process. You will be able to chose the most appropriate production deployment procedure for each service. However, there is a bit of overhead that comes from handling multiple git repositories and their respective configurations etc.
+
+The multi-repository approach has been dominant for the last five years or so in my experience, but lately there has been a hype around mono-repos, so it might be that this will become more dominant in the future. In summary, both approaches are widely used so you can't really go wrong here.
+
+** What should I use for the client?
+:PROPERTIES:
+:CUSTOM_ID: what-should-i-use-for-the-client
+:END:
+Here there are SO many options that it's almost a joke. The most common tools for writing front-ends in the industry currently though is by far React, followed by Vue and then Angular. While I do love using vanilla JavaScript, when making a more complex web page there are just so many benefits to using a framework like React, if you learn the basics you will be able to focus more on implementing the functionality than trying to figure out how to implement the functionality since you need to reinvent the wheel at every turn. [[https://developer.mozilla.org/en-US/docs/Learn/Tools_and_testing/Client-side_JavaScript_frameworks][MDN's page on JavaScript frameworks]] gives a good overview of some common ones and what they bring to the table.
+
+I recommend you use the framework you are most comfortable with. If you don't know any framework, I recommend you use this opportunity to get yourself acquainted with one. If you are not sure which one to choose go with React because it is basically an industry standard at the time of writing (2022).
+
+*** But I want to be adventurous!!
+:PROPERTIES:
+:CUSTOM_ID: but-i-want-to-be-adventurous
+:END:
+If you feel that the mainstream JavaScript frameworks are boring and not for you, then you've come to the right place. There are so many other interesting and fascinating ways to build front-ends that do not follow down the much trodden path. Maybe the frameworks listed here are not for this project right now, but they might provide a source of inspiration later on your journey as a developer. The list here focuses on frameworks that choose to do things differently and some of them are not even in JavaScript (though they do transpile down to JavaScript in most cases). I do recommend you at one point give yourself the opportunity to try some of these out, not only because it's a lot of fun, but also because they challenge the conventional way of doing things and provide a great learning experience.
+
+- [[https://elm-lang.org/][Elm]] :: You think TypeScript does not provide you the amount of type-checking you need for your project? Say hi to Elm, a [[https://www.haskell.org/][Haskell]]-inspired purely functional programming language made for the sole purpose of building web apps. The on-boarding experience is great and the error messages are AMAZING.
+- [[https://clojurescript.org/][ClojureScript]] :: ClojureScript (as well as its parent language [[https://clojure.org/][Clojure]]) is a LISP which is a family of languages that has a few common traits: very simple syntax, lots of parentheses and the treatment of code as data. LISPs are really great for writing code that writes code. However, this is not the only thing ClojureScript does well, it is tailored towards functional programming with immutability at the center and interesting ways of handling concurrency. Getting used to LISPs is a real mind-bender and will really help broaden your horizons as a developer.
+- [[https://www.purescript.org/][PureScript]] :: You tried Elm and felt it did a bit too much hand-holding? Then PureScript is for you. It's even more inspired by Haskell and comes with full support for esoteric features such as type classes, higher kinded types and higher rank polymorphism (not sure what the last one means, but sounds awesome). Prepare yourself for a steep learning curve, but you will most likely find yourself at the cusp of modern programming language theory after getting proficient in this language.
+- [[https://cycle.js.org/][Cycle.js]] :: What if instead of writing a web app that allows for human interactions, you flipped the whole premise on its head and instead put the stream of interactions at the center of your web app? Cycle.js is built around the concept of reactive streams. Everything are streams of events which you use to render you application and add interactivity. In the beginning it feels extremely backwards, but once you "get it" it starts to feel like a really natural way of thinking about apps and services.
+- [[https://yew.rs/][Yew]] :: Ready to tick off two buzzwords with a single framework? With Yew you write your code in [[https://www.rust-lang.org/][Rust]] and it compiles down to [[https://webassembly.org/][WebAssembly]], the new web language on the block. Even though you write your page in Rust, the overall experience is similar to React and Elm.
+- [[https://reasonml.github.io/][Reason ML]] :: From what I heard the draft for this project was what lead to the development of React at Facebook. It is very similar to Elm, but uses a language called [[https://ocaml.org/][OCaml]] as its foundation.
+
+** How to structure the API itself?
+:PROPERTIES:
+:CUSTOM_ID: how-to-structure-the-api-itself
+:END:
+When you write your server it helps to think of it as having at least three different /layers/.
+
+#+caption: ~GET /dogs/:id~ split into layers
+#+attr_org: :width 700px
+#+name: web-browser
+[[./assets/layered-http-api.png]]
+
+- First comes the /interface layer/ which is the only thing the client needs to know about.
+- Next comes a /controller layer/ which encapsulates the main server logic, for instance picking out data from the request and preparing it for the next layer, and decides the response to be sent back to the client.
+- Next comes the /service layer/ which encapsulates your database or third-party API etc.
+
+There are multiple benefits to following this approach and separate each layer into its own module (file). The main benefit is separation of concerns: if you manage to confine your database logic and operations into a separate module it will allow you to switch the database with hardly any modifications necessary outside of the database module. It also allows you to have your own data models within your server that does not necessarily correspond to the database models. This too simplifies the process of switching out your database without any major modifications outside of the database module.
+
+* Resources and useful links
+:PROPERTIES:
+:CUSTOM_ID: resources-and-useful-links
+:END:
+*General*
+- [[https://github.com/iensu/data-interaction-course-materials][Course GitHub repository with code examples and exercises]]
+- [[https://developer.mozilla.org/en-US/docs/Web/Performance/How_browsers_work][How browsers work]]
+- [[https://restfulapi.net/][What is a REST API?]]
+
+*Express*
+- [[https://zellwk.com/blog/async-await-express][Async/Await in Express]]
+
+*MongoDB*
+- [[https://docs.mongodb.com/manual/crud/][MongoDB CRUD operations]]
+- [[https://docs.mongodb.com/drivers/node/current/fundamentals/crud/][MongoDB JavaScript Driver CRUD operations]]

@@ -1,0 +1,20 @@
+### Adding a dawg
+POST http://localhost:4649/dogs
+Content-Type: application/json
+
+{
+  "_id": "a",
+  "url": "https://made-up.com/image.jpg",
+  "title": "Some funny dog",
+  "breed": "Golden retriever",
+  "containsPuppy": false
+}
+
+### Getting Chihuahuas
+GET http://localhost:4649/dogs?breed=chihuahua
+
+### Search through title
+GET http://localhost:4649/dogs?title=pope&breed=chihuahua&age=14
+
+### Get a dog
+GET http://localhost:4649/dogs/d
